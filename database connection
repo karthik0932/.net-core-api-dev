@@ -1,0 +1,2 @@
+Scaffold-DbContext "Server=ELW5232;Database=Tech_Arc_360;Integrated Security=true;MultipleActiveResultSets=true;TrustServerCertificate=True;"Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -f    
+ code for databse connection as this is datafirst approach
