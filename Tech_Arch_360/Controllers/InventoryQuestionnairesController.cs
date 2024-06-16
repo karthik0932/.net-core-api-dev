@@ -1,10 +1,12 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Tech_Arch_360.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Tech_Arch_360.Controllers
@@ -90,6 +92,33 @@ namespace Tech_Arch_360.Controllers
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, $"Error saving JSON data: {ex.Message}");
+            }
+        }
+
+        [HttpGet("user-data/{userId}")]
+        [Authorize]
+        public async Task<IActionResult> GetUserQuestionnaires(int userId)
+        {
+            try
+            {
+                var questionnaires = await _context.InventoryQuestionnaires
+                    .Where(q => q.CreatedBy == userId.ToString()) // Assuming CreatedBy stores user ID as a string
+                    .Select(q => new
+                    {
+                        q.Question,
+                        q.Answer,
+                        q.Instructions
+                    })
+                    .ToListAsync();
+
+                if (questionnaires == null || !questionnaires.Any())
+                    return NotFound("No data found for the given user ID.");
+
+                return Ok(questionnaires);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error fetching user data: {ex.Message}");
             }
         }
 
