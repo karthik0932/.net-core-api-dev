@@ -2,6 +2,11 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Tech_Arch_360.Models;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+
 namespace Tech_Arch_360.Controllers
 {
     [ApiController]
@@ -10,13 +15,13 @@ namespace Tech_Arch_360.Controllers
     {
         private readonly Tech_Arc_360Context _context;
         private readonly ExcelService _excelService;
-        private readonly IHttpContextAccessor _httpContextAccessor; // Inject IHttpContextAccessor
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public InventoryQuestionnairesController(Tech_Arc_360Context context, ExcelService excelService, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _excelService = excelService;
-            _httpContextAccessor = httpContextAccessor; // Assign to local variable
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpPost("upload")]
@@ -26,22 +31,74 @@ namespace Tech_Arch_360.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("Please upload a valid Excel file.");
 
-            var filePath = Path.Combine(Directory.GetCurrentDirectory(), file.FileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            try
             {
-                await file.CopyToAsync(stream);
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), file.FileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var username = _httpContextAccessor.HttpContext.User.Identity.Name;
+                var questionnaires = _excelService.ReadExcelFile(filePath, username);
+
+                _context.InventoryQuestionnaires.AddRange(questionnaires);
+                await _context.SaveChangesAsync();
+
+                return Ok("File uploaded and data saved successfully.");
             }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error uploading file: {ex.Message}");
+            }
+        }
 
-            // Get authenticated user's name from HttpContext
-            var username = _httpContextAccessor.HttpContext.User.Identity.Name;
+        [HttpPost("json")]
+        [Authorize]
+        public async Task<IActionResult> StoreJsonData([FromBody] List<InventoryQuestionnaireCreateModel> models)
+        {
+            if (models == null || models.Count == 0)
+                return BadRequest("No JSON data provided or empty list.");
 
-            var questionnaires = _excelService.ReadExcelFile(filePath, username); // Pass username to service
+            try
+            {
+                var username = _httpContextAccessor.HttpContext.User.Identity.Name;
 
-            _context.InventoryQuestionnaires.AddRange(questionnaires);
-            await _context.SaveChangesAsync();
+                List<InventoryQuestionnaire> questionnaires = new List<InventoryQuestionnaire>();
 
-            return Ok("File uploaded and data saved successfully.");
+                foreach (var model in models)
+                {
+                    var questionnaire = new InventoryQuestionnaire
+                    {
+                        Question = model.Question,
+                        Answer = model.Answer,
+                        Instructions = model.Instructions,
+                        JsonData = model.JsonData,
+                        CreatedBy = username,
+                        CreatedOn = DateTime.UtcNow
+                    };
+
+                    questionnaires.Add(questionnaire);
+                }
+
+                _context.InventoryQuestionnaires.AddRange(questionnaires);
+                await _context.SaveChangesAsync();
+
+                return Ok("JSON data saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error saving JSON data: {ex.Message}");
+            }
+        }
+
+        public class InventoryQuestionnaireCreateModel
+        {
+            public string Question { get; set; }
+            public string Answer { get; set; }
+            public string Instructions { get; set; }
+            public string JsonData { get; set; }
         }
     }
 }
