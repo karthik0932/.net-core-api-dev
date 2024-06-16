@@ -1,2 +1,30 @@
 Scaffold-DbContext "Server=ELW5232;Database=Tech_Arc_360;Integrated Security=true;MultipleActiveResultSets=true;TrustServerCertificate=True;"Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -f    
  code for databse connection as this is datafirst approach
+
+
+USE Tech_Arc_360;  -- Specify your database name
+
+CREATE TABLE [dbo].[Users] (
+    [Id] INT IDENTITY(1,1) PRIMARY KEY,
+    [Username] NVARCHAR(50) NOT NULL,
+    [PasswordHash] NVARCHAR(200) NOT NULL,
+    [Role] NVARCHAR(20) NOT NULL
+);
+
+CREATE TABLE InventoryQuestionnaires (
+    QuestionID INT PRIMARY KEY IDENTITY(1,1),
+    TenantID INT NOT NULL,
+    Question NVARCHAR(500) NOT NULL,
+    Answer NVARCHAR(MAX),
+    Instructions NVARCHAR(MAX),
+    CreatedBy NVARCHAR(100) NOT NULL,
+    CreatedOn DATETIME NOT NULL DEFAULT GETDATE(),
+    ModifiedBy NVARCHAR(100),
+    ModifiedOn DATETIME,
+    AnsweredBy NVARCHAR(100),
+    AnsweredOn DATETIME,
+    LastAnswerModifiedBy NVARCHAR(100),
+    LastAnswerModifiedOn DATETIME
+);
+
+ALTER TABLE InventoryQuestionnaires ADD JsonData NVARCHAR(MAX);
