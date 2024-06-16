@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
+using OfficeOpenXml;
 using Tech_Arch_360.Models;
 
 public class Startup
@@ -16,8 +16,13 @@ public class Startup
 
     public void ConfigureServices(IServiceCollection services)
     {
+
+        services.AddHttpContextAccessor();
+
         services.AddControllers();
 
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        services.AddTransient<ExcelService>();
         // Generate and store the JWT key
         var key = GenerateRandomKey();
         var symmetricSecurityKey = new SymmetricSecurityKey(key);
