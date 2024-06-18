@@ -18,6 +18,8 @@ namespace Tech_Arch_360.Models
         public DateTime? AnsweredOn { get; set; }
         public string? LastAnswerModifiedBy { get; set; }
         public DateTime? LastAnswerModifiedOn { get; set; }
-        public string? JsonData { get; set; }
+        public int? UserId { get; set; }
+
+        public virtual UserMaster? User { get; set; }
     }
 }

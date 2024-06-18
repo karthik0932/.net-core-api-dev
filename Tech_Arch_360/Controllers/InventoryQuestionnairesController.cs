@@ -42,7 +42,10 @@ namespace Tech_Arch_360.Controllers
                     await file.CopyToAsync(stream);
                 }
 
-                var username = _httpContextAccessor.HttpContext.User.Identity.Name;
+                var username = _httpContextAccessor.HttpContext?.User?.Identity?.Name;
+                if (string.IsNullOrEmpty(username))
+                    return Unauthorized("User identity not found.");
+
                 var questionnaires = _excelService.ReadExcelFile(filePath, username);
 
                 _context.InventoryQuestionnaires.AddRange(questionnaires);
@@ -65,18 +68,24 @@ namespace Tech_Arch_360.Controllers
 
             try
             {
-                var username = _httpContextAccessor.HttpContext.User.Identity.Name;
+                var username = _httpContextAccessor.HttpContext?.User?.Identity?.Name;
+                if (string.IsNullOrEmpty(username))
+                    return Unauthorized("User identity not found.");
 
                 List<InventoryQuestionnaire> questionnaires = new List<InventoryQuestionnaire>();
 
                 foreach (var model in models)
                 {
+                    // Log the TenantId received in the request
+                    Console.WriteLine($"Received TenantId: {model.TenantId}");
+
                     var questionnaire = new InventoryQuestionnaire
                     {
                         Question = model.Question,
                         Answer = model.Answer,
                         Instructions = model.Instructions,
-                        JsonData = model.JsonData,
+                        TenantId = model.TenantId,     // Assign TenantId
+                        UserId = model.UserId,         // Assign UserID
                         CreatedBy = username,
                         CreatedOn = DateTime.UtcNow
                     };
@@ -95,14 +104,29 @@ namespace Tech_Arch_360.Controllers
             }
         }
 
-        [HttpGet("user-data/{userId}")]
+
+        [HttpGet("{userId}/{tenantId}")]
         [Authorize]
-        public async Task<IActionResult> GetUserQuestionnaires(int userId)
+        public async Task<IActionResult> GetUserQuestionnaires(int userId, int tenantId)
         {
             try
             {
+                // Ensure user is authenticated
+                var username = _httpContextAccessor.HttpContext?.User?.Identity?.Name;
+                if (string.IsNullOrEmpty(username))
+                    return Unauthorized("User identity not found.");
+
+                // Find the user based on the username (assuming username is unique and mapped to UserId)
+                var user = await _context.UserMasters.SingleOrDefaultAsync(u => u.UserId == userId);
+                if (user == null)
+                    return Unauthorized("User not found.");
+
+                // Ensure the authenticated user matches the requested userId
+                if (user.UserId != userId)
+                    return Forbid("Access denied. You are not authorized to access this resource.");
+
                 var questionnaires = await _context.InventoryQuestionnaires
-                    .Where(q => q.CreatedBy == userId.ToString()) // Assuming CreatedBy stores user ID as a string
+                    .Where(q => q.TenantId == tenantId && q.UserId == userId) // Filter by TenantId and UserId
                     .Select(q => new
                     {
                         q.Question,
@@ -112,7 +136,7 @@ namespace Tech_Arch_360.Controllers
                     .ToListAsync();
 
                 if (questionnaires == null || !questionnaires.Any())
-                    return NotFound("No data found for the given user ID.");
+                    return NotFound($"No data found for Tenant ID {tenantId} and User ID {userId}.");
 
                 return Ok(questionnaires);
             }
@@ -122,12 +146,15 @@ namespace Tech_Arch_360.Controllers
             }
         }
 
+
         public class InventoryQuestionnaireCreateModel
         {
-            public string Question { get; set; }
-            public string Answer { get; set; }
-            public string Instructions { get; set; }
-            public string JsonData { get; set; }
+            public string? Question { get; set; }
+            public string? Answer { get; set; }
+            public string? Instructions { get; set; }
+            public int TenantId { get; set; }
+            public int UserId { get; set; }
         }
+
     }
 }

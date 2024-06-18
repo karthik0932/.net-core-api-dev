@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Tech_Arch_360.Models;
+using System.Threading.Tasks;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -24,19 +25,34 @@ public class UsersController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] UserRegisterDto userRegister)
     {
-        if (await _context.Users.AnyAsync(x => x.Username == userRegister.Username))
+        if (await _context.UserMasters.AnyAsync(x => x.UserName == userRegister.Username))
             return BadRequest("Username is already taken");
 
-#pragma warning disable CS8601 // Possible null reference assignment.
-        var user = new User
+        // Validate RoleName and retrieve or create RoleMaster entry
+        var role = await _context.RoleMasters.FirstOrDefaultAsync(r => r.RoleName == userRegister.RoleName);
+        if (role == null)
         {
-            Username = userRegister.Username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(userRegister.Password),
-            Role = userRegister.Role
+            role = new RoleMaster { RoleName = userRegister.RoleName };
+            _context.RoleMasters.Add(role);
+            await _context.SaveChangesAsync();  // Save RoleMaster entry
+        }
+
+        // Validate TenantId
+        var tenant = await _context.TenantMasters.FindAsync(userRegister.TenantId);
+        if (tenant == null)
+            return BadRequest("Invalid Tenant ID");
+
+        var user = new UserMaster
+        {
+            UserName = userRegister.Username,
+            Password = BCrypt.Net.BCrypt.HashPassword(userRegister.Password),
+            RoleId = role.RoleId,  // Assign RoleId from RoleMaster
+            TenantId = userRegister.TenantId,
+            CreatedOn = DateTime.UtcNow,
+            IsActive = true
         };
 
-
-        _context.Users.Add(user);
+        _context.UserMasters.Add(user);
         await _context.SaveChangesAsync();
 
         return Ok(new { Message = "User registered successfully" });
@@ -45,18 +61,25 @@ public class UsersController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] UserLoginDto userLogin)
     {
-        var user = await _context.Users.SingleOrDefaultAsync(x => x.Username == userLogin.Username);
+        var user = await _context.UserMasters.SingleOrDefaultAsync(x => x.UserName == userLogin.Username);
 
-        if (user == null || !BCrypt.Net.BCrypt.Verify(userLogin.Password, user.PasswordHash))
-            return Unauthorized();
+        if (user == null)
+        {
+            return Unauthorized(new { Error = "Invalid username or password." });
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(userLogin.Password, user.Password))
+        {
+            return Unauthorized(new { Error = "Invalid username or password." });
+        }
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
             {
-                new Claim(ClaimTypes.Name, user.Id.ToString()),
-                new Claim(ClaimTypes.Role,value: user.Role)
+                new Claim(ClaimTypes.Name, user.UserId.ToString()),
+                new Claim(ClaimTypes.Role, user.RoleId.ToString())
             }),
             Expires = DateTime.UtcNow.AddHours(1),
             SigningCredentials = new SigningCredentials(_key, SecurityAlgorithms.HmacSha256Signature)
@@ -66,23 +89,33 @@ public class UsersController : ControllerBase
         return Ok(new { Token = tokenHandler.WriteToken(token) });
     }
 
-    [HttpGet("me")]
+
+    [HttpGet("details")]
     [Authorize]
     public async Task<IActionResult> GetUserDetails()
     {
-#pragma warning disable CS8604 // Possible null reference argument.
-        var userId = int.Parse(User.FindFirst(ClaimTypes.Name)?.Value);
-#pragma warning restore CS8604 // Possible null reference argument.
-        var user = await _context.Users.FindAsync(userId);
+        var userIdClaim = User.FindFirst(ClaimTypes.Name)?.Value;
+        if (userIdClaim == null)
+        {
+            return Unauthorized("User identity not found.");
+        }
+
+        var userId = int.Parse(userIdClaim);
+
+        // Include the RoleMaster entity to access RoleName
+        var user = await _context.UserMasters
+                                 .Include(u => u.Role)
+                                 .SingleOrDefaultAsync(u => u.UserId == userId);
 
         if (user == null)
             return NotFound();
 
         return Ok(new
         {
-            user.Id,
-            user.Username,
-            user.Role
+            user.UserId,
+            user.UserName,
+            RoleName = user.Role?.RoleName, // Access RoleName from the related Role entity
+            user.TenantId
         });
     }
 }
@@ -91,7 +124,8 @@ public class UserRegisterDto
 {
     public string? Username { get; set; }
     public string? Password { get; set; }
-    public string? Role { get; set; }
+    public string? RoleName { get; set; }
+    public int TenantId { get; set; } // Added TenantId
 }
 
 public class UserLoginDto
