@@ -3,7 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using OfficeOpenXml;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Tech_Arch_360.Models;
+using Tech_Arch_360.Services;
 
 public class Startup
 {
@@ -16,13 +19,20 @@ public class Startup
 
     public void ConfigureServices(IServiceCollection services)
     {
-
+        services.AddScoped<MenuService>();
         services.AddHttpContextAccessor();
 
-        services.AddControllers();
+        services.AddControllers().AddJsonOptions(options =>
+        {
+            // Use `Ignore` to remove `$id` and other metadata properties
+            options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+            options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+            options.JsonSerializerOptions.WriteIndented = true;
+        });
 
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         services.AddTransient<ExcelService>();
+
         // Generate and store the JWT key
         var key = GenerateRandomKey();
         var symmetricSecurityKey = new SymmetricSecurityKey(key);

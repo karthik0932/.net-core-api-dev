@@ -61,6 +61,7 @@ public class UsersController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] UserLoginDto userLogin)
     {
+        // Find the user by username
         var user = await _context.UserMasters.SingleOrDefaultAsync(x => x.UserName == userLogin.Username);
 
         if (user == null)
@@ -68,19 +69,21 @@ public class UsersController : ControllerBase
             return Unauthorized(new { Error = "Invalid username or password." });
         }
 
+        // Verify the password
         if (!BCrypt.Net.BCrypt.Verify(userLogin.Password, user.Password))
         {
             return Unauthorized(new { Error = "Invalid username or password." });
         }
 
+        // Create JWT token
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
             {
-                new Claim(ClaimTypes.Name, user.UserId.ToString()),
-                new Claim(ClaimTypes.Role, user.RoleId.ToString())
-            }),
+            new Claim(ClaimTypes.Name, user.UserId.ToString()),
+            new Claim(ClaimTypes.Role, user.RoleId.ToString())
+        }),
             Expires = DateTime.UtcNow.AddHours(1),
             SigningCredentials = new SigningCredentials(_key, SecurityAlgorithms.HmacSha256Signature)
         };
@@ -88,6 +91,7 @@ public class UsersController : ControllerBase
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return Ok(new { Token = tokenHandler.WriteToken(token) });
     }
+
 
 
     [HttpGet("details")]

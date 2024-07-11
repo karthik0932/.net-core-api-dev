@@ -106,6 +106,8 @@ namespace Tech_Arch_360.Models
 
                 entity.Property(e => e.CreatedOn).HasColumnType("datetime");
 
+                entity.Property(e => e.Link).HasMaxLength(255);
+
                 entity.Property(e => e.MenuName)
                     .HasMaxLength(100)
                     .IsUnicode(false);
@@ -142,17 +144,27 @@ namespace Tech_Arch_360.Models
             modelBuilder.Entity<RoleMenuMaster>(entity =>
             {
                 entity.HasKey(e => e.RoleMenuId)
-                    .HasName("PK__RoleMenu__F86287962FAA5786");
+                    .HasName("PK__RoleMenu__F8628796E51E04B0");
 
                 entity.ToTable("RoleMenuMaster");
 
-                entity.Property(e => e.RoleMenuId)
-                    .ValueGeneratedNever()
-                    .HasColumnName("RoleMenuID");
+                entity.Property(e => e.RoleMenuId).HasColumnName("RoleMenuID");
 
                 entity.Property(e => e.CreatedOn).HasColumnType("datetime");
 
                 entity.Property(e => e.ModifiedOn).HasColumnType("datetime");
+
+                entity.HasOne(d => d.Menu)
+                    .WithMany(p => p.RoleMenuMasters)
+                    .HasForeignKey(d => d.MenuId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("FK__RoleMenuM__MenuI__619B8048");
+
+                entity.HasOne(d => d.Role)
+                    .WithMany(p => p.RoleMenuMasters)
+                    .HasForeignKey(d => d.RoleId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("FK__RoleMenuM__RoleI__60A75C0F");
             });
 
             modelBuilder.Entity<TenantMaster>(entity =>

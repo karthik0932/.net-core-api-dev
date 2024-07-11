@@ -7,6 +7,7 @@ namespace Tech_Arch_360.Models
     {
         public RoleMaster()
         {
+            RoleMenuMasters = new HashSet<RoleMenuMaster>();
             UserMasters = new HashSet<UserMaster>();
         }
 
@@ -19,6 +20,7 @@ namespace Tech_Arch_360.Models
         public int? ModifiedBy { get; set; }
         public bool? IsActive { get; set; }
 
+        public virtual ICollection<RoleMenuMaster> RoleMenuMasters { get; set; }
         public virtual ICollection<UserMaster> UserMasters { get; set; }
     }
 }
