@@ -26,7 +26,7 @@ public class MenuController : ControllerBase
         // Projecting necessary properties without including $id
         var result = new
         {
-            memulist = menus.Select(m => new { menuid = m.Id, name = m.Name, link = m.Link }),
+            menulist = menus.Select(m => new { menuid = m.Id, name = m.Name, link = m.Link }),
             submenu = menus.SelectMany(m => m.SubMenus.Select(sm => new { maninmenuid = m.Id, name = sm.Name, link = sm.Link }))
         };
 
